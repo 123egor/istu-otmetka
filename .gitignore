@@ -1,45 +1,32 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
-
-# dependencies
+# Зависимости
 node_modules/
 
-# Expo
-.expo/
+# Сборки
 dist/
-web-build/
-expo-env.d.ts
+build/
 
-# Native
-.kotlin/
-*.orig.*
-*.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
+# Playwright
+/ms-playwright/
+playwright-report/
+test-results/
 
-# Metro
-.metro-health-check*
+# SQLite
+*.db
+*.db-shm
+*.db-wal
 
-# debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
-
-# macOS
-.DS_Store
-*.pem
-
-# local env files
-.env*.local
-
-# typescript
-*.tsbuildinfo
-
-# generated native folders
-/ios
-/android
-
-# остатки старой ПК-версии (секреты и профиль браузера) — не коммитить
+# Окружение
 .env
-data/
+.env.local
+.env.*.local
+
+# Логи
+*.log
+npm-debug.log*
+
+# Системное
+.DS_Store
+Thumbs.db
+
+# Claude Code (worktree, сессии)
+.claude/

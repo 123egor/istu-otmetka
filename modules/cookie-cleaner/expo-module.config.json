@@ -1,9 +1,0 @@
-{
-  "platforms": ["apple", "android"],
-  "apple": {
-    "modules": ["CookieCleanerModule"]
-  },
-  "android": {
-    "modules": ["expo.modules.cookiecleaner.CookieCleanerModule"]
-  }
-}

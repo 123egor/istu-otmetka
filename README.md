@@ -1,119 +1,78 @@
-# Отмечалка ИРНИТУ — мобильное приложение (React Native / Expo)
+# Отмечалка ИРНИТУ — web
 
-Скан QR-кода посещения или ссылка → вход на `marks.istu.edu` во встроенном WebView
-с автозаполнением логина и пароля. Всё работает прямо на телефоне, сервер не нужен.
+Web-версия отмечалки: авторизация на `*.istu.edu` через реальный headless-браузер (Playwright) на сервере. Поддерживает одиночный вход по ссылке/QR и **батч-авторизацию** нескольких аккаунтов параллельно.
 
-## Как работает
+Локально запускается **без Docker, Postgres и Redis** — используется встроенный в Node SQLite и очередь в памяти.
 
-1. **Скан QR** камерой в приложении или **вставка ссылки** (руками или кнопкой «Вставить из буфера»).
-2. Ссылка проверяется: принимается только `https://marks.istu.edu/…` или `https://app.istu.edu/…`.
-   Всё остальное отклоняется до открытия страницы.
-3. Ссылка открывается во встроенном WebView. Если логин и пароль сохранены, форма входа
-   (ЕСИА ИРНИТУ) заполняется и отправляется автоматически. Без сохранённых данных можно войти вручную на странице.
-4. **После успешного входа сессия стирается.** Через 3 секунды (чтобы страница подтверждения
-   успела догрузиться) удаляются:
-   - все куки WebView, включая HttpOnly (нативно, через локальный модуль `modules/cookie-cleaner`);
-   - `localStorage`, `sessionStorage`, IndexedDB и Cache Storage страницы.
+## Стек
 
-   Кроме того, WebView работает в режиме `incognito`: на диск ничего не сохраняется, а на Android
-   при каждом открытии старые куки удаляются. Куки чистятся ещё и при запуске приложения,
-   при закрытии экрана страницы и при сворачивании приложения после входа.
-   **Итог: при каждом новом открытии нужно авторизоваться заново.**
+| Слой | Технология |
+|------|------------|
+| Frontend | React + TypeScript + Vite |
+| Backend | Node.js + Express + TypeScript |
+| Автоматизация | Playwright (headless Chromium) |
+| База | SQLite (`node:sqlite`, встроен в Node 22+) |
+| Очередь | in-memory (с ограничением параллельности) |
 
-### Защита
-
-- Логин и пароль лежат в защищённом хранилище ОС (iOS Keychain / Android Keystore,
-  `WHEN_UNLOCKED_THIS_DEVICE_ONLY`) и никуда не отправляются, кроме формы входа.
-- Скрипт автозаполнения внедряется только на `*.istu.edu` по https и перепроверяет домен сам.
-- Переходы WebView за пределы `*.istu.edu` блокируются.
-- Форма отправляется автоматически не больше одного раза за сеанс, чтобы не заблокировать учётку
-  при неверном пароле.
-
-Настройки (домены, задержки, лимиты) лежат в `src/config.ts`.
+> Для сервера/VPS слой БД можно заменить на PostgreSQL, а очередь — на BullMQ + Redis (заготовка `docker-compose.yml` в репозитории).
 
 ## Структура
 
 ```
-index.ts                          точка входа (expo-router/entry)
-src/
-  config.ts                       домены, задержки, лимиты — все настройки в одном месте
-  app/                            экраны = маршруты Expo Router (только UI и навигация)
-    _layout.tsx                   провайдеры, Stack, очистка кук при запуске
-    index.tsx                     главный: скан / вставка ссылки
-    scan.tsx                      камера, скан QR (expo-camera)
-    settings.tsx                  логин и пароль
-    login.tsx                     WebView со входом (?url=…), перепроверка ссылки
-  features/                       бизнес-логика по функциям
-    credentials/                  хранение логина/пароля (expo-secure-store) + контекст
-    session/                      очистка кук (нативно) и хранилищ страницы (JS)
-    web-login/                    скрипты для страницы, хук useLoginFlow, баннер статуса
-  lib/                            чистые утилиты без UI
-    url.ts                        разбор и проверка ссылок из QR, буфера и deep link
-    navigation.ts                 «назад» с запасным переходом на главный
-  ui/                             общие компоненты: Button, TextField, Screen, цвета
-modules/
-  cookie-cleaner/                 локальный нативный Expo-модуль (Kotlin/Swift): стирает куки
-                                  и данные WebView, включая HttpOnly
+.
+├── server/            # Backend
+│   └── src/
+│       ├── index.ts   # Express API (accounts, attend, batch + SSE)
+│       ├── auth.ts    # Авторизация через Playwright
+│       ├── queue.ts   # Очередь в памяти + воркер
+│       └── db.ts      # SQLite (accounts, batch_jobs, batch_results)
+├── client/            # Frontend
+│   └── src/
+│       ├── App.tsx
+│       ├── screens/   # Home, Login, Accounts, Settings, Batch
+│       └── components/
+├── docker-compose.yml # (опционально) Postgres + Redis для прод-варианта
+└── package.json       # npm workspaces
 ```
-
-Правила зависимостей: `app → features → lib/config`, `ui` используется всеми;
-`features` не импортируют экраны, `lib` не знает про React Native.
-Импорты внутри `src` — через алиас `@/` (например, `@/features/credentials`).
-
-Экран входа доступен и по deep link: `otmechalka://login?url=https://marks.istu.edu/…`.
-Адрес в нём проверяется так же строго, как при скане QR.
 
 ## Запуск
 
-Нужен Node.js 20+.
+Нужен только **Node 22+** (проверено на v24).
 
 ```bash
-npm install
+npm install            # ставит server + client, затем playwright install chromium
 ```
 
-Приложение использует нативный модуль очистки кук, поэтому нужна **development-сборка**
-(в Expo Go он не работает, см. ниже). После обновления зависимостей с нативным кодом
-(например, `expo-router` / `react-native-screens`) dev-сборку нужно пересобрать.
-
-### Вариант А: собрать APK в облаке (без Android Studio)
+В двух терминалах:
 
 ```bash
-npx eas-cli@latest login
-npx eas-cli@latest build --profile development --platform android   # dev-сборка
-npm start                                                            # сервер Metro
+npm run dev:server     # http://localhost:3000
+npm run dev:client     # http://localhost:5173 (проксирует /api на :3000)
 ```
 
-Готовое приложение без сервера разработки, просто APK на телефон:
+Откройте `http://localhost:5173`.
+
+Файл БД `server/istu_auth.db` создаётся автоматически при первом запуске.
+
+### Продакшн
 
 ```bash
-npx eas-cli@latest build --profile preview --platform android
+npm run build          # собирает client, затем компилирует server
+npm start              # сервер отдаёт client/dist на http://localhost:3000
 ```
 
-Для iOS то же с `--platform ios`, но нужен аккаунт Apple Developer.
+## API
 
-### Вариант Б: локально (Android Studio / Xcode)
+| Метод | Путь | Назначение |
+|-------|------|-----------|
+| `GET` | `/api/accounts` | список аккаунтов |
+| `POST` | `/api/accounts` | добавить/обновить аккаунт |
+| `DELETE` | `/api/accounts/:id` | удалить аккаунт |
+| `POST` | `/api/attend` | одиночная авторизация |
+| `POST` | `/api/batch` | запустить батч |
+| `GET` | `/api/batch/:jobId/stream` | SSE-прогресс батча |
+| `GET` | `/api/batch/:jobId/results` | результаты батча |
 
-```bash
-npm run android    # или: npm run ios (только macOS)
-```
+## Разрешённые домены
 
-### Expo Go (быстрая проверка)
-
-```bash
-npm run start:go
-```
-
-Всё работает, кроме нативной очистки кук. Сессия всё равно не переживёт закрытие страницы
-благодаря `incognito`, но стирание HttpOnly-кук сразу после входа будет только в dev- или
-prod-сборке.
-
-## Если автозаполнение перестало работать
-
-Скрипт ищет `input[type="password"]` и ближайшее текстовое поле перед ним, затем жмёт кнопку
-с текстом «Войти» или «Вход» (или отправляет форму). Если сайт поменяет вёрстку, правьте
-`buildFillJs` в `src/features/web-login/scripts.ts`.
-
-## Совет по безопасности
-
-Пароль от ЕСИА ИРНИТУ мог засветиться при отладке старой ПК-версии. Смените его, когда всё
-заработает.
+Авторизация выполняется только на `marks.istu.edu` и `app.istu.edu`. Переходы за пределы `*.istu.edu` блокируются на уровне Playwright.

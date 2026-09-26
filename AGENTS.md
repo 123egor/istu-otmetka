@@ -1,41 +1,31 @@
-This is an Expo/React Native mobile application. Prioritize mobile-first patterns, performance, and cross-platform compatibility.
+Это web-приложение (монорепо на npm workspaces): `server/` (Node.js + Express + TypeScript) и `client/` (React + Vite + TypeScript).
 
-## Expo has changed — do not trust your training data
+## Стек
 
-Expo ships breaking changes every SDK release. APIs you remember are likely renamed, moved, or removed. Before writing any code that touches an Expo, EAS, or React Native API:
+- **Backend**: Node.js 22+, Express, TypeScript (ESM). Запуск через `tsx`.
+- **Автоматизация браузера**: Playwright (headless Chromium). Вся авторизация на `*.istu.edu` идёт через реальный браузерный контекст, не через голые HTTP-запросы.
+- **База**: SQLite через встроенный модуль `node:sqlite` (без нативной компиляции). Файл `server/istu_auth.db`. SQL напрямую, без ORM.
+- **Очередь**: in-memory (`server/src/queue.ts`) с ограничением параллельности. Redis/BullMQ намеренно не используются локально.
+- **Frontend**: React 19 + Vite. Стили — инлайн через объекты стилей и `theme.ts`, без CSS-фреймворков. UI mobile-first.
 
-1. Read the major version of the `expo` package in `package.json`.
-2. Fetch the matching versioned docs: `https://docs.expo.dev/versions/v<major>.0.0/`
-3. For anything else, fetch https://docs.expo.dev/llms.txt — an index of all Expo docs with corrections to common LLM misconceptions. Follow its links to the specific page you need; never answer from memory.
+Локально ничего внешнего (Docker/Postgres/Redis) не требуется — только Node.
 
-## Commands
-
-Use `bunx` instead of `npx` if the project uses bun (`bun.lock` present).
+## Команды
 
 ```bash
-npx expo install <package>  # ALWAYS use instead of npm/yarn/pnpm/bun add — resolves SDK-compatible versions
-npx expo start              # start the dev server
-npx expo lint               # lint
-npx tsc --noEmit            # typecheck
-npx expo-doctor             # diagnose dependency and config issues
-npx expo install --fix      # fix incompatible package versions
+npm install          # ставит оба workspace + playwright install chromium
+npm run dev:server   # backend на :3000
+npm run dev:client   # frontend на :5173 (проксирует /api)
+npm run build        # client build + server tsc
+npm run typecheck    # проверка типов обоих пакетов
 ```
 
-Run lint and typecheck before declaring any task done.
+Перед завершением задачи прогоняй `npm run typecheck`.
 
-## Navigation & Routing
+## Правила
 
-- Use **Expo Router** for all navigation. Routes live in `src/app/` — every file there is a screen, `_layout.tsx` files define navigators. Keep non-route code (components, hooks, utils) outside `src/app/`.
-- Import `Link`, `router`, and `useLocalSearchParams` from `expo-router`.
-- Docs: https://docs.expo.dev/router/introduction.md
-
-## Building with EAS
-
-Use EAS to build, sign, and submit the app in the cloud (`eas build`, `eas submit`) and to ship over-the-air updates (`eas update`) — no local Xcode or Android Studio required. Run EAS CLI as `bunx eas-cli <command>` in Bun projects, or `npx eas-cli@latest <command>` otherwise; substitute that for bare `eas` in docs examples.
-Docs: https://docs.expo.dev/eas/index.md
-
-## Rules
-
-- If `ios/` and `android/` directories do not exist, they are generated (Continuous Native Generation). Never create or edit them by hand — configure native behavior in `app.json` and config plugins.
-- Expo Go only includes its bundled native modules. After adding a library with native code, the app needs a development build: `npx expo run:ios|android` locally, or `eas build --profile development`.
-- Prefer recommended Expo modules over third-party libraries, and check your available skills before adding dependencies. Docs: https://docs.expo.dev/versions/latest/index.md
+- Разрешённые для авторизации домены — только `marks.istu.edu` и `app.istu.edu`. Не расширяй список без явной просьбы.
+- Секреты и настройки — через `.env` (пример в `server/.env.example`), не хардкодить.
+- Логику авторизации (`server/src/auth.ts`) меняй осторожно: она повторяет поведение исходного мобильного WebView (ожидание формы, заполнение полей React-совместимым способом, определение успеха по URL и отсутствию поля пароля).
+- Frontend не обращается к ISTU напрямую — только через `/api/*` к своему серверу.
+- Если переводишь на прод-инфраструктуру (Postgres + Redis) — держи тот же интерфейс модулей `db.ts` и `queue.ts`, чтобы `index.ts` не менялся.
