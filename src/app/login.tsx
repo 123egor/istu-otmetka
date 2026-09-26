@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { WebView } from 'react-native-webview';
@@ -29,9 +29,11 @@ export default function LoginRoute() {
 }
 
 function WebLoginScreen({ url }: { url: string }) {
-  const { credentials } = useCredentials();
+  // Профиль фиксируется при открытии экрана: смена активного профиля во время входа на него не влияет.
+  const { active } = useCredentials();
+  const [profile] = useState(active);
   const webRef = useRef<WebView>(null);
-  const { phase, currentUrl, loading, webViewProps } = useLoginFlow(webRef, url, credentials);
+  const { phase, currentUrl, loading, webViewProps } = useLoginFlow(webRef, url, profile);
 
   return (
     <Screen>
@@ -45,6 +47,7 @@ function WebLoginScreen({ url }: { url: string }) {
         </Pressable>
       </View>
 
+      {profile && <Text style={styles.profile}>👤 {profile.name}</Text>}
       <StatusBanner phase={phase} />
 
       <WebView
@@ -78,6 +81,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   host: { flex: 1, fontSize: 14, color: colors.muted },
+  profile: { paddingHorizontal: 14, paddingTop: 8, fontSize: 13, color: colors.muted },
   close: { paddingHorizontal: 6, paddingVertical: 4 },
   closeText: { fontSize: 16, fontWeight: '600', color: colors.primary },
   rejected: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 16 },
