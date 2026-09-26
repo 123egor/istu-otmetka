@@ -12,7 +12,7 @@
    (ЕСИА ИРНИТУ) заполняется и отправляется автоматически. Без сохранённых данных можно войти вручную на странице.
 4. **После успешного входа сессия стирается.** Через 3 секунды (чтобы страница подтверждения
    успела догрузиться) удаляются:
-   - все куки WebView, включая HttpOnly (нативно, через `@react-native-cookies/cookies`);
+   - все куки WebView, включая HttpOnly (нативно, через локальный модуль `modules/cookie-cleaner`);
    - `localStorage`, `sessionStorage`, IndexedDB и Cache Storage страницы.
 
    Кроме того, WebView работает в режиме `incognito`: на диск ничего не сохраняется, а на Android
@@ -51,6 +51,9 @@ src/
     url.ts                        разбор и проверка ссылок из QR, буфера и deep link
     navigation.ts                 «назад» с запасным переходом на главный
   ui/                             общие компоненты: Button, TextField, Screen, цвета
+modules/
+  cookie-cleaner/                 локальный нативный Expo-модуль (Kotlin/Swift): стирает куки
+                                  и данные WebView, включая HttpOnly
 ```
 
 Правила зависимостей: `app → features → lib/config`, `ui` используется всеми;

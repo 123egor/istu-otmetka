@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
-    "@react-native-cookies/cookies": "^6.2.1",
     "expo": "~57.0.25",
     "expo-camera": "~57.0.5",
     "expo-clipboard": "~57.0.2",
@@ -14,6 +13,7 @@
     "expo-secure-store": "~57.0.4",
     "expo-status-bar": "~57.0.1",
     "react": "19.2.3",
+    "react-dom": "19.2.3",
     "react-native": "0.86.3",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
