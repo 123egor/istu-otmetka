@@ -62,7 +62,9 @@ export function useLoginFlow(webRef: RefObject<WebView | null>, url: string, cre
       sub.remove();
       if (stableTimer.current) clearTimeout(stableTimer.current);
       if (wipeTimer.current) clearTimeout(wipeTimer.current);
-      void clearNativeCookies();
+      // Уже очищенный сеанс не чистим повторно: при переходе к следующему профилю
+      // это асинхронно стёрло бы куки нового входа, который уже начался.
+      if (!wipedRef.current) void clearNativeCookies();
     };
   }, [wipeSession]);
 
