@@ -5,7 +5,13 @@ const LOGIN_PATH = '/esia/login';
 const NAV_SUFFIX = 'istu.edu';
 const FILL_WAIT_MS = 15_000;
 
-export type AuthStatus = 'success' | 'wrong_credentials' | 'error' | 'timeout';
+export type AuthStatus =
+  | 'success' // вход выполнен И отметка прошла («Вас отметили»)
+  | 'not_marked' // вход выполнен, но метка не сработала («Ой, нерабочая метка»)
+  | 'unknown' // вход выполнен, но результат отметки не распознан
+  | 'wrong_credentials'
+  | 'error'
+  | 'timeout';
 
 export type AuthResult = {
   status: AuthStatus;
@@ -50,6 +56,29 @@ function isNavigableHost(url: string): boolean {
   }
 }
 
+// Определяет по тексту страницы, прошла ли отметка.
+// Маркеры основаны на реальном тексте ИРНИТУ: «Вас отметили» / «Ой, нерабочая метка».
+function classifyMark(text: string): 'success' | 'not_marked' | 'unknown' {
+  const s = text.toLowerCase();
+  if (/нерабоч|недействительн|устарел|истёк|истек|не найдена|ошибк/.test(s)) return 'not_marked';
+  if (/отмети|отмечен|зафиксир|учтён|учтен|засчит|успешно/.test(s)) return 'success';
+  return 'unknown';
+}
+
+async function readMarkResult(page: import('playwright').Page): Promise<AuthResult> {
+  const title = await page.title();
+  const fullText = await page.evaluate(() => document.body?.innerText ?? '');
+  const mark = classifyMark(`${title} ${fullText}`);
+  const status: AuthStatus = mark === 'not_marked' ? 'not_marked' : mark === 'unknown' ? 'unknown' : 'success';
+  const message =
+    mark === 'not_marked'
+      ? 'Отметка не прошла — метка нерабочая или недействительная'
+      : mark === 'unknown'
+        ? 'Вход выполнен, но результат отметки не распознан — проверьте страницу'
+        : undefined;
+  return { status, url: page.url(), pageTitle: title, pageText: fullText.slice(0, 400), message };
+}
+
 export async function authorize(login: string, password: string, targetUrl: string): Promise<AuthResult> {
   const browser = await getBrowser();
   let context: BrowserContext | null = null;
@@ -87,9 +116,7 @@ export async function authorize(login: string, password: string, targetUrl: stri
     if (isAllowedHost(page.url()) && !isLoginUrl(page.url())) {
       const hasPassword = await page.$('input[type="password"]');
       if (!hasPassword) {
-        const title = await page.title();
-        const text = await page.evaluate(() => document.body?.innerText?.slice(0, 400) ?? '');
-        return { status: 'success', url: page.url(), pageTitle: title, pageText: text };
+        return await readMarkResult(page);
       }
     }
 
@@ -184,9 +211,9 @@ export async function authorize(login: string, password: string, targetUrl: stri
     const hasPasswordAfter = await page.$('input[type="password"]');
 
     if (isAllowedHost(finalUrl) && !isLoginUrl(finalUrl) && !hasPasswordAfter) {
-      const title = await page.title();
-      const text = await page.evaluate(() => document.body?.innerText?.slice(0, 400) ?? '');
-      return { status: 'success', url: finalUrl, pageTitle: title, pageText: text };
+      // Даём странице отрисовать результат отметки перед чтением текста.
+      await page.waitForTimeout(800);
+      return await readMarkResult(page);
     }
 
     return { status: 'wrong_credentials', url: finalUrl };

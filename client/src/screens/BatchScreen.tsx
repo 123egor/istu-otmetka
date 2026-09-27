@@ -14,10 +14,19 @@ type JobResult = BatchResultRow & { pending?: boolean };
 
 const STATUS_ICON: Record<string, string> = {
   success: '✅',
+  not_marked: '⚠️',
+  unknown: '❓',
   wrong_credentials: '🔑',
   error: '❌',
   timeout: '⏱',
   pending: '⏳',
+};
+
+const STATUS_TEXT: Record<string, string> = {
+  wrong_credentials: 'Неверный логин или пароль',
+  not_marked: 'Отметка не прошла (нерабочая метка)',
+  unknown: 'Вход есть, результат отметки не распознан',
+  timeout: 'Превышено время ожидания',
 };
 
 export function BatchScreen({ onManageAccounts, onLogout }: Props) {
@@ -201,17 +210,16 @@ export function BatchScreen({ onManageAccounts, onLogout }: Props) {
                 borderRadius: 10,
                 backgroundColor: r.pending ? '#f9fafb'
                   : r.status === 'success' ? colors.okBg
-                  : r.status === 'wrong_credentials' ? colors.warnBg
-                  : colors.errBg,
+                  : r.status === 'error' ? colors.errBg
+                  : colors.warnBg,
               }}>
                 <span style={{ fontSize: 18 }}>{STATUS_ICON[r.pending ? 'pending' : r.status] ?? '?'}</span>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 14, fontWeight: 600, color: colors.text }}>{r.login}</div>
                   {!r.pending && (
                     <div style={{ fontSize: 12, color: colors.muted }}>
-                      {r.status === 'success' ? r.page_title ?? 'Успешно'
-                        : r.status === 'wrong_credentials' ? 'Неверный логин или пароль'
-                        : r.message ?? r.status}
+                      {r.status === 'success' ? r.page_title ?? 'Отметка прошла'
+                        : STATUS_TEXT[r.status] ?? r.message ?? r.status}
                     </div>
                   )}
                   {r.pending && <div style={{ fontSize: 12, color: colors.muted }}>Ожидание…</div>}
@@ -224,10 +232,10 @@ export function BatchScreen({ onManageAccounts, onLogout }: Props) {
         {summary && (
           <div style={{ padding: '12px 16px', borderRadius: 12, backgroundColor: summary.fail === 0 ? colors.okBg : colors.warnBg }}>
             <div style={{ fontWeight: 700, fontSize: 15, color: colors.text }}>
-              Готово: {summary.ok}/{summary.total} успешно
+              Готово: отмечено {summary.ok}/{summary.total}
             </div>
             {summary.fail > 0 && (
-              <div style={{ fontSize: 13, color: colors.muted }}>Не удалось: {summary.fail}</div>
+              <div style={{ fontSize: 13, color: colors.muted }}>Не отмечено: {summary.fail}</div>
             )}
           </div>
         )}

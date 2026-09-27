@@ -1,4 +1,10 @@
-export type AuthStatus = 'success' | 'wrong_credentials' | 'error' | 'timeout';
+export type AuthStatus =
+  | 'success'
+  | 'not_marked'
+  | 'unknown'
+  | 'wrong_credentials'
+  | 'error'
+  | 'timeout';
 
 export type Account = {
   id: number;
