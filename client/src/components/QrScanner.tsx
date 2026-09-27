@@ -26,6 +26,7 @@ export function QrScanner({ onResult, onCancel }: { onResult: (url: string) => v
   const trackRef = useRef<MediaStreamTrack | null>(null);
   const nativeZoomRef = useRef(false);
   const zoomRef = useRef(1);
+  const lastRejectedRef = useRef('');
 
   useEffect(() => {
     let stopped = false;
@@ -60,7 +61,7 @@ export function QrScanner({ onResult, onCancel }: { onResult: (url: string) => v
         canvas.height = sh;
         ctx!.drawImage(v, sx, sy, sw, sh, 0, 0, sw, sh);
         const img = ctx!.getImageData(0, 0, sw, sh);
-        const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+        const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'attemptBoth' });
         if (code?.data) {
           const url = parseQrUrl(code.data);
           if (url) {
@@ -69,13 +70,18 @@ export function QrScanner({ onResult, onCancel }: { onResult: (url: string) => v
             onResult(url);
             return;
           }
+          // QR распознан, но это не ссылка ИРНИТУ — показываем, что нашли
+          if (lastRejectedRef.current !== code.data) {
+            lastRejectedRef.current = code.data;
+            setError(`QR распознан, но это не ссылка ИРНИТУ:\n${code.data.slice(0, 80)}`);
+          }
         }
       }
       timer = setTimeout(scanTick, 150);
     }
 
     navigator.mediaDevices
-      .getUserMedia({ video: { facingMode: 'environment' } })
+      .getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } })
       .then((stream) => {
         video.srcObject = stream;
         return video.play().then(() => stream);
@@ -126,7 +132,7 @@ export function QrScanner({ onResult, onCancel }: { onResult: (url: string) => v
         <span style={{ color: '#fff', fontSize: 16, fontWeight: 600, textShadow: '0 1px 3px rgba(0,0,0,0.6)' }}>Наведите камеру на QR-код</span>
         <div style={{ width: 240, height: 240, border: '3px solid #fff', borderRadius: 20, boxShadow: '0 0 0 100vmax rgba(0,0,0,0.35)' }} />
         {error && (
-          <span style={{ color: '#fff', backgroundColor: 'rgba(220,38,38,0.92)', padding: '10px 16px', borderRadius: 8, textAlign: 'center' }}>
+          <span style={{ color: '#fff', backgroundColor: 'rgba(220,38,38,0.92)', padding: '10px 16px', borderRadius: 8, textAlign: 'center', whiteSpace: 'pre-line', wordBreak: 'break-all', maxWidth: 320 }}>
             {error}
           </span>
         )}
