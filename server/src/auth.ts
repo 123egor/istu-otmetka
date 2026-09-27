@@ -66,6 +66,15 @@ function classifyMark(text: string): 'success' | 'not_marked' | 'unknown' {
 }
 
 async function readMarkResult(page: import('playwright').Page): Promise<AuthResult> {
+  // Ждём ровно до появления текста результата (быстрее фиксированной паузы).
+  try {
+    await page.waitForFunction(
+      () => /отмет|отмечен|нерабоч|недействительн|зафиксир|засчит|ошибк/i.test(document.body?.innerText ?? ''),
+      { timeout: 6000 },
+    );
+  } catch {
+    /* маркер не появился за 6с — читаем что есть */
+  }
   const title = await page.title();
   const fullText = await page.evaluate(() => document.body?.innerText ?? '');
   const mark = classifyMark(`${title} ${fullText}`);
@@ -97,10 +106,18 @@ export async function authorize(login: string, password: string, targetUrl: stri
     // Строка (не функция) — чтобы esbuild её не трансформировал.
     await context.addInitScript('globalThis.__name = globalThis.__name || function (f) { return f; };');
 
-    // Блокируем переходы за пределы *.istu.edu
+    // Блокируем переходы за пределы *.istu.edu + не грузим тяжёлое (ускорение).
     await context.route('**/*', (route) => {
-      const url = route.request().url();
-      if (route.request().resourceType() === 'document' && !isNavigableHost(url) && !url.startsWith('about:')) {
+      const req = route.request();
+      const type = req.resourceType();
+      const url = req.url();
+      // Чужой домен (документ) — блок, как раньше
+      if (type === 'document' && !isNavigableHost(url) && !url.startsWith('about:')) {
+        route.abort();
+        return;
+      }
+      // Для входа и отметки не нужны картинки/шрифты/медиа — экономим время загрузки
+      if (type === 'image' || type === 'media' || type === 'font') {
         route.abort();
         return;
       }
@@ -211,8 +228,6 @@ export async function authorize(login: string, password: string, targetUrl: stri
     const hasPasswordAfter = await page.$('input[type="password"]');
 
     if (isAllowedHost(finalUrl) && !isLoginUrl(finalUrl) && !hasPasswordAfter) {
-      // Даём странице отрисовать результат отметки перед чтением текста.
-      await page.waitForTimeout(800);
       return await readMarkResult(page);
     }
 

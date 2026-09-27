@@ -1,4 +1,4 @@
-Это web-приложение (монорепо на npm workspaces): `server/` (Node.js + Express + TypeScript) и `client/` (React + Vite + TypeScript).
+npm run dev:serverЭто web-приложение (монорепо на npm workspaces): `server/` (Node.js + Express + TypeScript) и `client/` (React + Vite + TypeScript).
 
 ## Стек
 
