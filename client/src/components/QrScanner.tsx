@@ -24,6 +24,13 @@ export function QrScanner({ onResult, onCancel }: { onResult: (url: string) => v
 
     let stopped = false;
 
+    // На не-HTTPS (кроме localhost) браузер не даёт доступ к камере —
+    // navigator.mediaDevices может быть undefined. Показываем понятное сообщение.
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError('Камера доступна только по HTTPS. Откройте сайт по https:// или вставьте ссылку вручную.');
+      return;
+    }
+
     navigator.mediaDevices
       .getUserMedia({ video: { facingMode: 'environment' } })
       .then((stream) => {
@@ -31,7 +38,7 @@ export function QrScanner({ onResult, onCancel }: { onResult: (url: string) => v
         void video.play();
         void scanLoop(video);
       })
-      .catch(() => setError('Нет доступа к камере. Разрешите в настройках браузера.'));
+      .catch(() => setError('Нет доступа к камере. Разрешите доступ в настройках браузера.'));
 
     async function scanLoop(v: HTMLVideoElement) {
       if (!('BarcodeDetector' in window)) {
